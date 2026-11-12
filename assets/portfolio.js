@@ -1,6 +1,67 @@
 (function () {
   "use strict";
 
+  var root = document.documentElement;
+
+  function store(key, value) {
+    try { localStorage.setItem(key, value); } catch (err) { /* storage unavailable */ }
+  }
+
+  var themeButton = document.querySelector(".theme-toggle");
+  function syncThemeButton() {
+    if (themeButton) themeButton.setAttribute("aria-pressed", String(root.getAttribute("data-theme") === "dark"));
+  }
+  if (themeButton) {
+    syncThemeButton();
+    themeButton.addEventListener("click", function () {
+      var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", next);
+      store("theme", next);
+      syncThemeButton();
+    });
+  }
+
+  var header = document.querySelector(".site-header");
+  var menuButton = document.querySelector(".menu-toggle");
+  function setMenu(open) {
+    if (!header || !menuButton) return;
+    header.classList.toggle("menu-open", open);
+    menuButton.setAttribute("aria-expanded", String(open));
+  }
+  if (menuButton) {
+    menuButton.addEventListener("click", function () {
+      setMenu(!header.classList.contains("menu-open"));
+    });
+    document.querySelectorAll("#site-nav a").forEach(function (link) {
+      link.addEventListener("click", function () { setMenu(false); });
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && header.classList.contains("menu-open")) {
+        setMenu(false);
+        menuButton.focus();
+      }
+    });
+    window.matchMedia("(min-width: 861px)").addEventListener("change", function (mq) {
+      if (mq.matches) setMenu(false);
+    });
+  }
+
+  var reveals = document.querySelectorAll(".reveal");
+  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!("IntersectionObserver" in window) || reduceMotion) {
+    reveals.forEach(function (el) { el.classList.add("is-visible"); });
+  } else {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.05 });
+    reveals.forEach(function (el) { observer.observe(el); });
+  }
+
   function digits(value) {
     return value.replace(/\D/g, "");
   }
@@ -23,8 +84,9 @@
   function updateContactLinks(service) {
     if (!box) return;
     var message = box.dataset.template.replace("{service}", service);
+    var subject = box.dataset.subjectTemplate.replace("{service}", service);
     box.querySelectorAll("[data-kind]").forEach(function (link) {
-      link.href = contactHref(link.dataset.kind, link.dataset.value, message, box.dataset.subject);
+      link.href = contactHref(link.dataset.kind, link.dataset.value, message, subject);
     });
   }
 
@@ -46,7 +108,10 @@
   filters.forEach(function (chip) {
     chip.addEventListener("click", function () {
       var cat = chip.dataset.filter;
-      filters.forEach(function (c) { c.classList.toggle("is-active", c === chip); });
+      filters.forEach(function (c) {
+        c.classList.toggle("is-active", c === chip);
+        c.setAttribute("aria-pressed", String(c === chip));
+      });
       items.forEach(function (item) { item.hidden = cat !== "*" && item.dataset.cat !== cat; });
     });
   });
